@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>MN Daily Items</title>
+<title>MN Daily Items Advanced</title>
 <style>
 body{margin:0;font-family:sans-serif;background:#f9f9f9;}
 header{display:flex;align-items:center;justify-content:space-between;padding:10px;background:#ff3f6c;color:white;flex-wrap:wrap;}
@@ -18,6 +18,7 @@ header button{padding:5px 10px;margin:2px;}
 .products{padding:20px;}
 #productsList{display:flex;flex-wrap:wrap;gap:10px;}
 .productCard{border:1px solid #ccc;padding:10px;width:150px;background:#fff;box-shadow:0 2px 5px rgba(0,0,0,0.1);box-sizing:border-box;text-align:center;}
+.productCard img{width:100px;height:100px;object-fit:cover;margin-bottom:5px;}
 .checkout{padding:20px;background:#fff;margin:20px;display:none;}
 .modal{display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);}
 .modal-content{background:white;padding:20px;margin:50px auto;width:300px;position:relative;box-sizing:border-box;}
@@ -53,23 +54,7 @@ button{cursor:pointer;}
 
 <section class="categories">
   <h2>Categories</h2>
-  <div class="category-cards">
-    <div class="category-card" data-category="Staples">
-      <img src="https://via.placeholder.com/100?text=Staples"><br>Staples
-    </div>
-    <div class="category-card" data-category="Oils & Spices">
-      <img src="https://via.placeholder.com/100?text=Oils"><br>Oils & Spices
-    </div>
-    <div class="category-card" data-category="Beverages">
-      <img src="https://via.placeholder.com/100?text=Beverages"><br>Beverages
-    </div>
-    <div class="category-card" data-category="Snacks">
-      <img src="https://via.placeholder.com/100?text=Snacks"><br>Snacks
-    </div>
-    <div class="category-card" data-category="Household">
-      <img src="https://via.placeholder.com/100?text=Household"><br>Household
-    </div>
-  </div>
+  <div class="category-cards" id="categoryCards"></div>
 </section>
 
 <section class="products" id="customerPage" style="display:none;">
@@ -114,7 +99,15 @@ button{cursor:pointer;}
   <h3>Add Product</h3>
   <input type="text" id="prodName" placeholder="Product Name">
   <input type="number" id="prodPrice" placeholder="Price">
-  <input type="text" id="prodImage" placeholder="Image URL">
+  <input type="text" id="prodImage" placeholder="Image URL (optional)">
+  <select id="prodImageDropdown">
+    <option value="">Select Default Image</option>
+    <option value="https://via.placeholder.com/100?text=Staples">Staples</option>
+    <option value="https://via.placeholder.com/100?text=Oils">Oils & Spices</option>
+    <option value="https://via.placeholder.com/100?text=Beverages">Beverages</option>
+    <option value="https://via.placeholder.com/100?text=Snacks">Snacks</option>
+    <option value="https://via.placeholder.com/100?text=Household">Household</option>
+  </select>
   <select id="prodCategory">
     <option value="Staples">Staples</option>
     <option value="Oils & Spices">Oils & Spices</option>
@@ -153,6 +146,26 @@ setInterval(()=>{
   img.style.opacity=0;
   setTimeout(()=>{img.src=sliderImages[sliderIndex];img.style.opacity=1;sliderIndex=(sliderIndex+1)%sliderImages.length;},200);
 },3000);
+
+// Categories Data
+const categories = [
+  {name:"Staples", img:"https://via.placeholder.com/100?text=Staples"},
+  {name:"Oils & Spices", img:"https://via.placeholder.com/100?text=Oils"},
+  {name:"Beverages", img:"https://via.placeholder.com/100?text=Beverages"},
+  {name:"Snacks", img:"https://via.placeholder.com/100?text=Snacks"},
+  {name:"Household", img:"https://via.placeholder.com/100?text=Household"}
+];
+
+// Load Categories dynamically
+const categoryCardsDiv = document.getElementById('categoryCards');
+categories.forEach(cat=>{
+  const div = document.createElement('div');
+  div.className = 'category-card';
+  div.setAttribute('data-category', cat.name);
+  div.innerHTML = `<img src="${cat.img}"><br>${cat.name}`;
+  div.onclick = ()=>loadProducts(cat.name);
+  categoryCardsDiv.appendChild(div);
+});
 
 // Products
 let products=JSON.parse(localStorage.getItem('products'))||[];
@@ -193,7 +206,7 @@ function loadProducts(filterCategory){
   if(filterCategory) filtered=products.filter(p=>p.category===filterCategory);
   filtered.forEach(p=>{
     list.innerHTML+=`<div class="productCard">
-      <img src="${p.image || 'https://via.placeholder.com/100'}" width="100"><br>
+      <img src="${p.image || 'https://via.placeholder.com/100'}"><br>
       <b>${p.name}</b> - ৳${p.price}<br>
       Category: ${p.category}<br>
       <button onclick="buyNow('${p.name}','${p.price}')">Buy Now</button>
@@ -208,16 +221,13 @@ document.getElementById('searchInput').addEventListener('input',function(){
   const list=document.getElementById('productsList');list.innerHTML='';
   filtered.forEach(p=>{
     list.innerHTML+=`<div class="productCard">
-      <img src="${p.image || 'https://via.placeholder.com/100'}" width="100"><br>
+      <img src="${p.image || 'https://via.placeholder.com/100'}"><br>
       <b>${p.name}</b> - ৳${p.price}<br>
       Category: ${p.category}<br>
       <button onclick="buyNow('${p.name}','${p.price}')">Buy Now</button>
     </div>`;
   });
 });
-
-// Category filter
-document.querySelectorAll('.category-card').forEach(card=>{card.onclick=()=>loadProducts(card.getAttribute('data-category'));});
 
 // Buy Now
 function buyNow(productName, price){
@@ -263,8 +273,9 @@ addProductBtn.onclick=()=>{
   const name=document.getElementById('prodName').value;
   const price=document.getElementById('prodPrice').value;
   const imageUrl=document.getElementById('prodImage').value.trim();
+  const imageDropdown=document.getElementById('prodImageDropdown').value;
   const category=document.getElementById('prodCategory').value;
-  const image = imageUrl || 'https://via.placeholder.com/100';
+  const image = imageUrl || imageDropdown || 'https://via.placeholder.com/100';
   if(name&&price&&category){
     products.push({name,price,image,category});
     localStorage.setItem('products',JSON.stringify(products));
@@ -278,7 +289,7 @@ function loadAdminProducts(){
   adminProducts.innerHTML='';
   products.forEach((p,i)=>{
     adminProducts.innerHTML+=`<div class="productCard">
-      <img src="${p.image || 'https://via.placeholder.com/100'}" width="100"><br>
+      <img src="${p.image || 'https://via.placeholder.com/100'}"><br>
       <b>${p.name}</b> - ৳${p.price}<br>
       Category: ${p.category}<br>
       <button onclick="deleteProduct(${i})">Delete</button>
@@ -294,19 +305,19 @@ function deleteProduct(i){
 }
 window.deleteProduct=deleteProduct;
 
-// Admin Image Preview with Dropdown
-const imageDropdown = document.getElementById('imageDropdown');
+// Admin Image Preview
+const imageDropdownPreview = document.getElementById('imageDropdown');
 const showImageBtn = document.getElementById('showImageBtn');
 const adminImagePreview = document.getElementById('adminImagePreview');
 const previewImg = document.getElementById('previewImg');
 const closePreview = document.getElementById('closePreview');
 
 showImageBtn.onclick = () => {
-  const url = imageDropdown.value;
+  const url = imageDropdownPreview.value;
   if(url){
     previewImg.src = url;
     adminImagePreview.style.display = 'block';
-  } else alert("Select an image from the dropdown");
+  } else alert("Select an image from dropdown");
 }
 
 closePreview.onclick = () => {
