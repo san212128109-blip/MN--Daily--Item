@@ -1,281 +1,377 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>MN Daily Items</title>
-<style>
-/* Reset & body */
-*{margin:0;padding:0;box-sizing:border-box;}
-body{font-family:sans-serif;background:#f5f5f5;}
+// MN-Daily-Items-App.jsx
+// Advanced single-file React + Tailwind component for MN Daily Items
+// Features: Responsive layout, slider, category scroller, searchable product grid,
+// cart drawer with quantity management, checkout mock (bKash/Nagad),
+// admin panel (local demo auth), product management, orders list (stored in localStorage),
+// framer-motion animations, lucide icons, and clear comments for production steps.
 
-/* Header */
-header{display:flex;align-items:center;justify-content:space-between;padding:10px 20px;background:#ff3f6c;color:white;flex-wrap:wrap;position:sticky;top:0;z-index:100;}
-header .logo{font-size:22px;font-weight:bold;}
-header input{padding:5px 10px;width:200px;border-radius:4px;border:none;}
-header button{margin-left:5px;padding:5px 10px;border:none;border-radius:4px;background:#fff;color:#ff3f6c;font-weight:bold;cursor:pointer;}
+import React, {useEffect, useMemo, useState} from "react";
+import {motion, AnimatePresence} from "framer-motion";
+import {ShoppingCart, User, KeyRound} from "lucide-react";
 
-/* Slider */
-.hero-slider{width:100%;height:300px;overflow:hidden;position:relative;margin-top:10px;}
-.hero-slider img{width:100%;height:300px;object-fit:cover;transition:opacity 0.5s;}
+// NOTE: This file is intended to be pasted into a React + Tailwind project
+// (Vite or CRA). See instructions below after the code.
 
-/* Categories */
-.categories{padding:20px;}
-.categories h2{margin-bottom:10px;}
-.category-cards{display:flex;overflow-x:auto;gap:10px;}
-.category-card{min-width:120px;background:#fff;padding:10px;text-align:center;box-shadow:0 2px 5px rgba(0,0,0,0.1);border-radius:5px;cursor:pointer;flex-shrink:0;}
-.category-card img{width:80px;height:80px;object-fit:cover;margin-bottom:5px;border-radius:5px;}
+const DEFAULT_PRODUCTS = [
+  {id: 'p1', name: 'Rice 5kg', price: 450, image: 'https://via.placeholder.com/400x300?text=Rice', category: 'Staples'},
+  {id: 'p2', name: 'Mustard Oil 1L', price: 220, image: 'https://via.placeholder.com/400x300?text=Oil', category: 'Oils & Spices'},
+  {id: 'p3', name: 'Tea 250g', price: 180, image: 'https://via.placeholder.com/400x300?text=Tea', category: 'Beverages'},
+  {id: 'p4', name: 'Salt 1kg', price: 30, image: 'https://via.placeholder.com/400x300?text=Salt', category: 'Staples'},
+  {id: 'p5', name: 'Biscuits Pack', price: 45, image: 'https://via.placeholder.com/400x300?text=Biscuits', category: 'Snacks'},
+  {id: 'p6', name: 'Dishwash Gel', price: 120, image: 'https://via.placeholder.com/400x300?text=Dishwash', category: 'Household'},
+];
 
-/* Products */
-.products{padding:20px;}
-.products h2{margin-bottom:10px;}
-#productsList{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:15px;}
-.productCard{background:#fff;padding:10px;text-align:center;border-radius:5px;box-shadow:0 2px 5px rgba(0,0,0,0.1);}
-.productCard img{width:100%;height:120px;object-fit:cover;margin-bottom:5px;}
-.productCard button{margin-top:5px;padding:5px 10px;border:none;border-radius:4px;background:#ff3f6c;color:white;font-weight:bold;cursor:pointer;}
+const SLIDER_IMAGES = [
+  'https://via.placeholder.com/1400x420?text=MN+Daily+Items+Banner+1',
+  'https://via.placeholder.com/1400x420?text=Weekend+Deals',
+  'https://via.placeholder.com/1400x420?text=Fresh+Arrivals',
+];
 
-/* Checkout */
-#checkoutSection{display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);justify-content:center;align-items:center;z-index:1000;}
-#checkoutSection .checkout-content{background:#fff;padding:20px;border-radius:8px;width:300px;text-align:center;}
+export default function App(){
+  // App-level state
+  const [products, setProducts] = useState(() => JSON.parse(localStorage.getItem('mn_products')) || DEFAULT_PRODUCTS);
+  const [categories] = useState(()=>[...new Set(products.map(p=>p.category)), 'All']);
+  const [query, setQuery] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState('All');
+  const [cart, setCart] = useState(()=> JSON.parse(localStorage.getItem('mn_cart')) || {});
+  const [showCart, setShowCart] = useState(false);
+  const [showAdmin, setShowAdmin] = useState(false);
+  const [adminAuthOpen, setAdminAuthOpen] = useState(false);
+  const [adminUser, setAdminUser] = useState('');
+  const [adminPasswordInput, setAdminPasswordInput] = useState('');
+  const [paymentNumber, setPaymentNumber] = useState(()=> localStorage.getItem('mn_payment')||'');
+  const [checkoutOpen, setCheckoutOpen] = useState(false);
+  const [orders, setOrders] = useState(()=> JSON.parse(localStorage.getItem('mn_orders')) || []);
+  const [sliderIndex, setSliderIndex] = useState(0);
 
-/* Modals */
-.modal{display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);justify-content:center;align-items:center;z-index:1000;}
-.modal-content{background:#fff;padding:20px;border-radius:8px;width:300px;position:relative;text-align:center;}
-.close{position:absolute;top:10px;right:10px;cursor:pointer;font-size:18px;font-weight:bold;}
+  // Sync important state to localStorage
+  useEffect(()=>{ localStorage.setItem('mn_products', JSON.stringify(products)); },[products]);
+  useEffect(()=>{ localStorage.setItem('mn_cart', JSON.stringify(cart)); },[cart]);
+  useEffect(()=>{ localStorage.setItem('mn_payment', paymentNumber); },[paymentNumber]);
+  useEffect(()=>{ localStorage.setItem('mn_orders', JSON.stringify(orders)); },[orders]);
 
-/* Admin Panel */
-#adminPanel{display:none;padding:20px;background:#fff;margin:20px;border-radius:8px;box-shadow:0 2px 5px rgba(0,0,0,0.2);}
-#adminProducts{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;}
+  // Slider auto-advance
+  useEffect(()=>{
+    const id = setInterval(()=> setSliderIndex(i=> (i+1)%SLIDER_IMAGES.length), 3500);
+    return ()=>clearInterval(id);
+  },[]);
 
-/* Scrollbar for categories */
-.category-cards::-webkit-scrollbar{height:6px;}
-.category-cards::-webkit-scrollbar-thumb{background:#ccc;border-radius:3px;}
-@media(max-width:768px){
-  header{flex-direction:column;align-items:flex-start;}
-  #productsList, #adminProducts{grid-template-columns:repeat(auto-fill,minmax(120px,1fr));}
+  // Derived product list with search & filter
+  const filtered = useMemo(()=>{
+    const q = query.trim().toLowerCase();
+    return products.filter(p=>{
+      if(selectedCategory !== 'All' && p.category !== selectedCategory) return false;
+      if(!q) return true;
+      return p.name.toLowerCase().includes(q) || p.category.toLowerCase().includes(q);
+    });
+  },[products, query, selectedCategory]);
+
+  // Cart helpers
+  function addToCart(product, qty=1){
+    setCart(prev=>{
+      const copy = {...prev};
+      const existing = copy[product.id] || {...product, qty:0};
+      existing.qty += qty;
+      copy[product.id]=existing;
+      return copy;
+    });
+    setShowCart(true);
+  }
+  function updateQty(productId, qty){
+    setCart(prev=>{
+      const copy = {...prev};
+      if(qty<=0) delete copy[productId]; else copy[productId].qty=qty;
+      return copy;
+    });
+  }
+  function clearCart(){ setCart({}); }
+
+  function placeOrder(){
+    // create order snapshot
+    const items = Object.values(cart);
+    if(items.length===0) { alert('Cart is empty'); return; }
+    if(!paymentNumber) { alert('Admin has not set a payment number yet. Please contact store.'); return; }
+    const total = items.reduce((s,i)=>s + Number(i.price)*i.qty,0);
+    const order = {id:`ord-${Date.now()}`, items, total, paymentNumber, date: new Date().toISOString()};
+    setOrders(prev=>[order,...prev]);
+    clearCart();
+    setCheckoutOpen(false);
+    alert('Order placed! Share the payment number with the customer and confirm the payment when received.');
+  }
+
+  // Admin auth (DEMO ONLY). Replace with real auth in production.
+  function tryAdminLogin(){
+    // Demo credential (insecure) - change in production.
+    const DEMO_USER='Daily';
+    const DEMO_PASS='nafis128!@*';
+    if(adminUser===DEMO_USER && adminPasswordInput===DEMO_PASS){
+      setShowAdmin(true);
+      setAdminAuthOpen(false);
+      setAdminPasswordInput('');
+      setAdminUser('');
+    } else alert('Wrong credentials (demo)');
+  }
+
+  // Admin product management
+  function addProductAdmin({name,price,image,category}){
+    const id = 'p'+(Date.now());
+    setProducts(prev=>[{id,name,price:Number(price),image: image||'https://via.placeholder.com/400x300',category},...prev]);
+  }
+  function deleteProductAdmin(id){
+    if(!confirm('Delete product?')) return;
+    setProducts(prev=>prev.filter(p=>p.id!==id));
+  }
+
+  // Orders management
+  function markOrderDone(id){
+    setOrders(prev=> prev.filter(o=>o.id!==id));
+  }
+
+  // UI pieces
+  const CartCount = Object.values(cart).reduce((s,i)=>s+i.qty,0);
+  const CartTotal = Object.values(cart).reduce((s,i)=>s + Number(i.price)*i.qty,0);
+
+  return (
+    <div className="min-h-screen bg-gray-50 text-gray-800">
+      {/* Header */}
+      <header className="bg-pink-600 text-white sticky top-0 z-40 shadow-md">
+        <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="font-extrabold text-xl">MN Daily Items</div>
+            <div className="hidden sm:block text-sm opacity-90">Fast local grocery delivery — demo app</div>
+          </div>
+
+          <div className="flex-1 px-4">
+            <input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Search products or categories..." className="w-full rounded-md px-3 py-2 text-sm shadow-sm" />
+          </div>
+
+          <div className="flex items-center gap-3">
+            <button onClick={()=>setAdminAuthOpen(true)} className="hidden md:inline-flex items-center gap-2 bg-white/20 hover:bg-white/30 px-3 py-2 rounded-md"> <KeyRound size={16}/> Admin</button>
+            <button onClick={()=>{ const phone = prompt('Enter your phone number to login as customer'); if(phone){ localStorage.setItem('mn_customer', phone); alert('Customer logged in as ' + phone); } }} className="hidden md:inline-flex items-center gap-2 bg-white/20 hover:bg-white/30 px-3 py-2 rounded-md"> <User size={16}/> Customer</button>
+
+            <button onClick={()=>setShowCart(true)} className="relative inline-flex items-center gap-2 bg-white text-pink-600 px-3 py-2 rounded-md font-semibold">
+              <ShoppingCart size={18}/> <span className="sr-only">Open cart</span>
+              <span className="ml-1">Cart</span>
+              {CartCount>0 && <span className="absolute -top-1 -right-1 bg-yellow-400 text-xs text-black rounded-full px-2">{CartCount}</span>}
+            </button>
+          </div>
+        </div>
+      </header>
+
+      {/* Slider */}
+      <div className="max-w-6xl mx-auto px-4 mt-4">
+        <div className="overflow-hidden rounded-lg shadow-md">
+          <img src={SLIDER_IMAGES[sliderIndex]} alt="banner" className="w-full h-56 md:h-80 object-cover transition-all duration-500" />
+        </div>
+      </div>
+
+      {/* Categories */}
+      <section className="max-w-6xl mx-auto px-4 mt-4">
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-semibold">Categories</h2>
+          <div className="text-sm opacity-80">Tap to filter</div>
+        </div>
+        <div className="mt-3 flex gap-3 overflow-x-auto py-2">
+          <button onClick={()=>setSelectedCategory('All')} className={`min-w-max px-3 py-2 rounded-md ${selectedCategory==='All'?'bg-pink-600 text-white':'bg-white shadow-sm'}`}>All</button>
+          {[...new Set(products.map(p=>p.category))].map(cat=> (
+            <button key={cat} onClick={()=>setSelectedCategory(cat)} className={`min-w-max px-3 py-2 rounded-md ${selectedCategory===cat?'bg-pink-600 text-white':'bg-white shadow-sm'}`}>{cat}</button>
+          ))}
+        </div>
+      </section>
+
+      {/* Main Grid - Products + Admin panel (if open) */}
+      <main className="max-w-6xl mx-auto px-4 py-6 grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Products list */}
+        <section className="lg:col-span-2">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-xl font-semibold">Products</h3>
+            <div className="text-sm text-gray-500">{filtered.length} items</div>
+          </div>
+
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+            {filtered.map(p=> (
+              <motion.div key={p.id} layout whileHover={{scale:1.02}} className="bg-white rounded-lg shadow-sm overflow-hidden">
+                <img src={p.image} alt={p.name} className="w-full h-36 object-cover" />
+                <div className="p-3">
+                  <div className="font-semibold">{p.name}</div>
+                  <div className="text-sm text-gray-500">{p.category}</div>
+                  <div className="mt-2 flex items-center justify-between">
+                    <div className="font-bold">৳{p.price}</div>
+                    <div className="flex gap-2">
+                      <button onClick={()=>addToCart(p,1)} className="bg-pink-600 text-white px-3 py-1 rounded-md text-sm">Add</button>
+                      <button onClick={()=>{ addToCart(p,1); setCheckoutOpen(true); }} className="border border-pink-600 text-pink-600 px-3 py-1 rounded-md text-sm">Buy</button>
+                    </div>
+                  </div>
+                </div>
+              </motion.div>
+            ))}
+          </div>
+        </section>
+
+        {/* Right column: small info + admin panel when active */}
+        <aside className="space-y-4">
+          <div className="bg-white rounded-lg shadow-sm p-4">
+            <h4 className="font-semibold">Store Info</h4>
+            <p className="text-sm text-gray-600 mt-2">Payment number: <b>{paymentNumber||'Not set'}</b></p>
+            <p className="text-sm text-gray-600 mt-2">Local demo: data stored in browser localStorage.</p>
+          </div>
+
+          {/* Admin Panel */}
+          <AnimatePresence>
+            {showAdmin && (
+              <motion.div initial={{opacity:0, y:20}} animate={{opacity:1, y:0}} exit={{opacity:0,y:20}} className="bg-white rounded-lg shadow-sm p-4">
+                <h4 className="font-semibold flex items-center justify-between">Admin Panel <span className="text-xs text-gray-500">Demo</span></h4>
+
+                <div className="mt-3">
+                  <label className="block text-xs text-gray-600">Payment number</label>
+                  <input className="w-full rounded-md border px-3 py-2 mt-1 text-sm" value={paymentNumber} onChange={e=>setPaymentNumber(e.target.value)} placeholder="Enter bKash / Nagad" />
+                </div>
+
+                <AddProductForm onAdd={addProductAdmin} />
+
+                <div className="mt-3">
+                  <h5 className="font-semibold">Orders</h5>
+                  <div className="mt-2 space-y-2 max-h-48 overflow-auto">
+                    {orders.length===0 ? <div className="text-sm text-gray-500">No orders yet.</div> : orders.map(o=> (
+                      <div key={o.id} className="border rounded p-2">
+                        <div className="text-sm font-medium">Order {o.id}</div>
+                        <div className="text-xs text-gray-600">Total: ৳{o.total} • {new Date(o.date).toLocaleString()}</div>
+                        <div className="mt-1 flex gap-2">
+                          <button onClick={()=>markOrderDone(o.id)} className="text-xs px-2 py-1 bg-green-600 text-white rounded">Mark done</button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="mt-3 flex gap-2">
+                  <button onClick={()=>{ setShowAdmin(false); localStorage.removeItem('mn_admin');}} className="px-3 py-2 rounded bg-red-500 text-white text-sm">Close Admin</button>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {/* Admin login toggle */}
+          <div className="bg-white rounded-lg shadow-sm p-4">
+            <h5 className="font-semibold">Admin Access</h5>
+            <div className="mt-2 flex gap-2">
+              <button onClick={()=>setAdminAuthOpen(true)} className="px-3 py-2 bg-pink-600 text-white rounded-md">Open Admin Login</button>
+              <button onClick={()=>{ setShowAdmin(false); setAdminAuthOpen(false); }} className="px-3 py-2 border rounded-md">Hide Admin</button>
+            </div>
+          </div>
+        </aside>
+      </main>
+
+      {/* Cart drawer */}
+      <AnimatePresence>
+        {showCart && (
+          <motion.aside initial={{x:300}} animate={{x:0}} exit={{x:300}} className="fixed right-4 top-16 w-80 max-w-sm h-[80vh] bg-white shadow-xl rounded-lg overflow-auto z-50">
+            <div className="p-4">
+              <div className="flex items-center justify-between">
+                <h4 className="font-semibold">Your Cart</h4>
+                <button onClick={()=>setShowCart(false)} className="text-sm text-gray-500">Close</button>
+              </div>
+
+              <div className="mt-3 space-y-3">
+                {Object.values(cart).length===0 ? (
+                  <div className="text-sm text-gray-500">Cart is empty</div>
+                ) : (
+                  Object.values(cart).map(item=> (
+                    <div key={item.id} className="flex items-center gap-3">
+                      <img src={item.image} className="w-14 h-14 object-cover rounded" />
+                      <div className="flex-1">
+                        <div className="font-medium text-sm">{item.name}</div>
+                        <div className="text-xs text-gray-500">৳{item.price} • Qty: <input value={item.qty} onChange={e=>updateQty(item.id, Number(e.target.value)||0)} className="w-12 text-center rounded border text-sm" /></div>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+
+              <div className="mt-4 border-t pt-3">
+                <div className="flex items-center justify-between font-bold">Total <span>৳{CartTotal}</span></div>
+                <div className="mt-3 flex gap-2">
+                  <button onClick={()=>{ setCheckoutOpen(true); setShowCart(false); }} className="flex-1 px-3 py-2 bg-pink-600 text-white rounded-md">Checkout</button>
+                  <button onClick={clearCart} className="px-3 py-2 border rounded-md">Clear</button>
+                </div>
+              </div>
+            </div>
+          </motion.aside>
+        )}
+      </AnimatePresence>
+
+      {/* Admin Auth Modal */}
+      <AnimatePresence>
+        {adminAuthOpen && (
+          <motion.dialog open className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+            <motion.div initial={{scale:0.95, opacity:0}} animate={{scale:1, opacity:1}} exit={{scale:0.95, opacity:0}} className="bg-white rounded-lg p-6 max-w-sm w-full">
+              <h3 className="font-semibold">Admin Login (demo)</h3>
+              <div className="mt-3">
+                <input placeholder="Username" value={adminUser} onChange={e=>setAdminUser(e.target.value)} className="w-full rounded-md border px-3 py-2 mb-2" />
+                <input placeholder="Password" type="password" value={adminPasswordInput} onChange={e=>setAdminPasswordInput(e.target.value)} className="w-full rounded-md border px-3 py-2" />
+                <div className="mt-3 flex gap-2">
+                  <button onClick={tryAdminLogin} className="flex-1 px-3 py-2 bg-pink-600 text-white rounded-md">Login</button>
+                  <button onClick={()=>setAdminAuthOpen(false)} className="px-3 py-2 border rounded-md">Cancel</button>
+                </div>
+                <div className="mt-2 text-xs text-gray-500">Demo credentials: Daily / nafis128!@*</div>
+              </div>
+            </motion.div>
+          </motion.dialog>
+        )}
+      </AnimatePresence>
+
+      {/* Checkout Modal */}
+      <AnimatePresence>
+        {checkoutOpen && (
+          <motion.dialog open className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+            <motion.div initial={{scale:0.95, opacity:0}} animate={{scale:1, opacity:1}} exit={{scale:0.95, opacity:0}} className="bg-white rounded-lg p-6 max-w-md w-full">
+              <h3 className="font-semibold">Checkout</h3>
+              <div className="mt-3">
+                <p className="text-sm text-gray-600">Payment Number: <b>{paymentNumber||'Not set'}</b></p>
+                <p className="text-sm text-gray-600">Method: bKash / Nagad (mock)</p>
+                <div className="mt-4 flex gap-2">
+                  <button onClick={placeOrder} className="flex-1 px-3 py-2 bg-pink-600 text-white rounded-md">Place Order</button>
+                  <button onClick={()=>setCheckoutOpen(false)} className="px-3 py-2 border rounded-md">Cancel</button>
+                </div>
+              </div>
+            </motion.div>
+          </motion.dialog>
+        )}
+      </AnimatePresence>
+
+      <footer className="mt-12 py-6 text-center text-sm text-gray-500">MN Daily Items • Demo • Localstore</footer>
+    </div>
+  );
 }
-</style>
-</head>
-<body>
 
-<header>
-  <div class="logo">MN Daily Items</div>
-  <input type="text" id="searchInput" placeholder="Search products...">
-  <div>
-    <button id="customerLoginBtnHeader">Customer Login</button>
-    <button id="adminLoginBtnHeader">Admin Login</button>
-  </div>
-</header>
 
-<div class="hero-slider">
-  <img id="sliderImg" src="https://via.placeholder.com/1200x300?text=MN+Daily+Items+Banner+1" alt="Banner">
-</div>
-
-<section class="categories">
-  <h2>Categories</h2>
-  <div class="category-cards" id="categoryCards"></div>
-</section>
-
-<section class="products" id="customerPage" style="display:none;">
-  <h2>Featured Products</h2>
-  <div id="productsList"></div>
-</section>
-
-<div id="checkoutSection">
-  <div class="checkout-content">
-    <h3>Checkout</h3>
-    <p>Payment Number: <span id="paymentNumber"></span></p>
-    <p>Method: bKash / Nagad</p>
-    <button onclick="closeCheckout()">Close</button>
-  </div>
-</div>
-
-<!-- Customer Login Modal -->
-<div id="customerLoginModal" class="modal">
-  <div class="modal-content">
-    <span class="close" id="closeCustomerModal">&times;</span>
-    <h3>Customer Login</h3>
-    <input type="text" id="customerPhone" placeholder="Enter phone number">
-    <button id="loginCustomerBtn">Login</button>
-  </div>
-</div>
-
-<!-- Admin Login Modal -->
-<div id="adminLoginModal" class="modal">
-  <div class="modal-content">
-    <span class="close" id="closeAdminModal">&times;</span>
-    <h3>Admin Login</h3>
-    <input type="text" id="adminUser" placeholder="Username">
-    <input type="password" id="adminPass" placeholder="Password">
-    <button id="adminLoginBtn">Login</button>
-  </div>
-</div>
-
-<!-- Admin Panel -->
-<div id="adminPanel">
-  <h2>Store Admin</h2>
-  <h3>Payment Number</h3>
-  <input type="text" id="adminPayment" placeholder="Enter bKash/Nagad Number">
-  <button id="savePayment">Save</button>
-
-  <h3>Add Product</h3>
-  <input type="text" id="prodName" placeholder="Product Name">
-  <input type="number" id="prodPrice" placeholder="Price">
-  <input type="text" id="prodImage" placeholder="Image URL">
-  <select id="prodCategory">
-    <option value="Staples">Staples</option>
-    <option value="Oils & Spices">Oils & Spices</option>
-    <option value="Beverages">Beverages</option>
-    <option value="Snacks">Snacks</option>
-    <option value="Household">Household</option>
-  </select>
-  <button id="addProductBtn">Add Product</button>
-
-  <h3>All Products</h3>
-  <div id="adminProducts"></div>
-</div>
-
-<script>
-// Slider
-let sliderImages=["https://via.placeholder.com/1200x300?text=MN+Daily+Items+Banner+1","https://via.placeholder.com/1200x300?text=MN+Daily+Items+Banner+2","https://via.placeholder.com/1200x300?text=MN+Daily+Items+Banner+3"];
-let sliderIndex=0;
-setInterval(()=>{
-  const img=document.getElementById('sliderImg');
-  img.style.opacity=0;
-  setTimeout(()=>{img.src=sliderImages[sliderIndex];img.style.opacity=1;sliderIndex=(sliderIndex+1)%sliderImages.length;},200);
-},3000);
-
-// Categories
-const categories=[{name:"Staples",img:"https://via.placeholder.com/80?text=Staples"},{name:"Oils & Spices",img:"https://via.placeholder.com/80?text=Oils"},{name:"Beverages",img:"https://via.placeholder.com/80?text=Beverages"},{name:"Snacks",img:"https://via.placeholder.com/80?text=Snacks"},{name:"Household",img:"https://via.placeholder.com/80?text=Household"}];
-const categoryCardsDiv=document.getElementById('categoryCards');
-categories.forEach(cat=>{
-  const div=document.createElement('div');
-  div.className='category-card';
-  div.innerHTML=`<img src="${cat.img}"><br>${cat.name}`;
-  div.onclick=()=>loadProducts(cat.name);
-  categoryCardsDiv.appendChild(div);
-});
-
-// Products
-let products=JSON.parse(localStorage.getItem('products'))||[];
-
-// Customer Login
-const customerLoginBtnHeader=document.getElementById('customerLoginBtnHeader');
-const customerModal=document.getElementById('customerLoginModal');
-const closeCustomerModal=document.getElementById('closeCustomerModal');
-const loginCustomerBtn=document.getElementById('loginCustomerBtn');
-const customerPhoneInput=document.getElementById('customerPhone');
-
-customerLoginBtnHeader.onclick=()=>{customerModal.style.display='flex';document.body.style.overflow='hidden';}
-closeCustomerModal.onclick=()=>{customerModal.style.display='none';document.body.style.overflow='auto';}
-loginCustomerBtn.onclick=()=>{
-  const phone=customerPhoneInput.value.trim();
-  if(phone){
-    localStorage.setItem('customerPhone',phone);
-    customerLoginBtnHeader.style.display='none';
-    customerModal.style.display='none';
-    document.body.style.overflow='auto';
-    loadCustomerPage();
-  }else alert("Enter phone number");
+// --- Helper component for admin product additions ---
+function AddProductForm({onAdd}){
+  const [name,setName]=useState('');
+  const [price,setPrice]=useState('');
+  const [image,setImage]=useState('');
+  const [category,setCategory]=useState('Staples');
+  function submit(){
+    if(!name||!price) return alert('Name & price required');
+    onAdd({name,price,image,category});
+    setName(''); setPrice(''); setImage('');
+  }
+  return (
+    <div className="mt-3 border-t pt-3">
+      <h5 className="font-medium">Add product</h5>
+      <input value={name} onChange={e=>setName(e.target.value)} placeholder="Product name" className="w-full rounded-md border px-3 py-2 mt-2" />
+      <input value={price} onChange={e=>setPrice(e.target.value)} placeholder="Price" type="number" className="w-full rounded-md border px-3 py-2 mt-2" />
+      <input value={image} onChange={e=>setImage(e.target.value)} placeholder="Image URL (optional)" className="w-full rounded-md border px-3 py-2 mt-2" />
+      <select value={category} onChange={e=>setCategory(e.target.value)} className="w-full rounded-md border px-3 py-2 mt-2">
+        <option>Staples</option>
+        <option>Oils & Spices</option>
+        <option>Beverages</option>
+        <option>Snacks</option>
+        <option>Household</option>
+      </select>
+      <div className="mt-2 flex gap-2">
+        <button onClick={submit} className="flex-1 bg-green-600 text-white px-3 py-2 rounded-md">Add</button>
+      </div>
+    </div>
+  );
 }
-if(localStorage.getItem('customerPhone')) customerLoginBtnHeader.style.display='none';
-
-// Admin Login
-const adminLoginBtnHeader=document.getElementById('adminLoginBtnHeader');
-const adminModal=document.getElementById('adminLoginModal');
-const closeAdminModal=document.getElementById('closeAdminModal');
-const adminLoginBtn=document.getElementById('adminLoginBtn');
-
-adminLoginBtnHeader.onclick=()=>{adminModal.style.display='flex';document.body.style.overflow='hidden';}
-closeAdminModal.onclick=()=>{adminModal.style.display='none';document.body.style.overflow='auto';}
-adminLoginBtn.onclick=()=>{
-  const username=document.getElementById('adminUser').value;
-  const password=document.getElementById('adminPass').value;
-  if(username==="Daily"&&password==="nafis128!@*"){
-    adminModal.style.display='none';
-    document.body.style.overflow='auto';
-    adminLoginBtnHeader.style.display='none';
-    document.getElementById('adminPanel').style.display='block';
-    loadAdminProducts();
-  }else alert("Wrong credentials");
-}
-
-// Load products
-function loadProducts(filterCategory){
-  document.getElementById('customerPage').style.display='block';
-  const list=document.getElementById('productsList'); list.innerHTML='';
-  let filtered=products;
-  if(filterCategory) filtered=products.filter(p=>p.category===filterCategory);
-  filtered.forEach(p=>{
-    list.innerHTML+=`<div class="productCard">
-      <img src="${p.image||'https://via.placeholder.com/100'}"><br>
-      <b>${p.name}</b><br>৳${p.price}<br>Category: ${p.category}<br>
-      <button onclick="buyNow('${p.name}','${p.price}')">Buy Now</button>
-    </div>`;
-  });
-}
-
-// Search
-document.getElementById('searchInput').addEventListener('input',function(){
-  const val=this.value.toLowerCase();
-  const filtered=products.filter(p=>p.name.toLowerCase().includes(val)||p.category.toLowerCase().includes(val));
-  loadProducts();
-});
-
-// Buy Now
-function buyNow(name,price){
-  const checkout=document.getElementById('checkoutSection');
-  checkout.style.display='flex';
-  document.getElementById('paymentNumber').innerText=localStorage.getItem('paymentNumber')||'Not set';
-}
-window.buyNow=buyNow;
-function closeCheckout(){document.getElementById('checkoutSection').style.display='none';}
-
-// Admin panel
-const savePayment=document.getElementById('savePayment');
-const adminPayment=document.getElementById('adminPayment');
-const addProductBtn=document.getElementById('addProductBtn');
-const adminProducts=document.getElementById('adminProducts');
-
-savePayment.onclick=()=>{
-  const val=adminPayment.value.trim();
-  if(val){localStorage.setItem('paymentNumber',val);alert("Saved!");}else alert("Enter number"); 
-}
-
-addProductBtn.onclick=()=>{
-  const name=document.getElementById('prodName').value;
-  const price=document.getElementById('prodPrice').value;
-  const image=document.getElementById('prodImage').value.trim();
-  const category=document.getElementById('prodCategory').value;
-  if(name&&price&&category){
-    products.push({name,price,image:image||'https://via.placeholder.com/100',category});
-    localStorage.setItem('products',JSON.stringify(products));
-    loadAdminProducts();
-    loadProducts();
-  }else alert("Fill all fields");
-}
-
-function loadAdminProducts(){
-  adminProducts.innerHTML='';
-  products.forEach((p,i)=>{
-    adminProducts.innerHTML+=`<div class="productCard">
-      <img src="${p.image||'https://via.placeholder.com/100'}"><br>
-      <b>${p.name}</b><br>৳${p.price}<br>Category: ${p.category}<br>
-      <button onclick="deleteProduct(${i})">Delete</button>
-    </div>`;
-  });
-}
-
-function deleteProduct(i){
-  products.splice(i,1);
-  localStorage.setItem('products',JSON.stringify(products));
-  loadAdminProducts();
-  loadProducts();
-}
-window.deleteProduct=deleteProduct;
-
-// Load products on page load
-loadProducts();
-</script>
-</body>
-</html>
